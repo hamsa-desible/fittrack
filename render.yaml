@@ -1,0 +1,36 @@
+# Render Blueprint: creates the web service and a PostgreSQL database in one step.
+services:
+  - type: web
+    name: fittrack
+    runtime: docker
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_HOST
+        fromDatabase:
+          name: fittrack-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: fittrack-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: fittrack-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: fittrack-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: fittrack-db
+          property: password
+
+databases:
+  - name: fittrack-db
+    plan: free
+    databaseName: fittrack
+    user: fittrack

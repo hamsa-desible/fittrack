@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitTrack</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+  <style>
+    :root {
+      --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #6b7385;
+      --accent: #2563eb; --accent-soft: #e8efff; --border: #e3e6ec; --danger: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11141a; --card: #1a1e27; --text: #e7e9ee; --muted: #9aa2b3;
+        --accent: #6b9bff; --accent-soft: #1f2a44; --border: #2a303c; --danger: #f87171;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    header { background: var(--card); border-bottom: 1px solid var(--border); }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+    header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
+    header h1 { font-size: 20px; margin: 0; }
+    header nav a { color: var(--accent); text-decoration: none; margin-left: 16px; font-size: 14px; }
+    main { padding: 24px 0 48px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; margin: 0 0 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+    label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 4px; flex: 1 1 140px; }
+    input, select, button { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+    button { background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 600; flex: 0 0 auto; }
+    button.link { background: none; color: var(--danger); padding: 4px 8px; font-weight: 500; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .stat { background: var(--accent-soft); border-radius: 10px; padding: 14px; }
+    .stat .v { font-size: 24px; font-weight: 700; }
+    .stat .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .pill { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .pager button { background: var(--accent-soft); color: var(--accent); }
+    .pager button:disabled { opacity: .4; cursor: default; }
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; display: none; max-width: calc(100% - 32px); }
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>🏃 FitTrack</h1>
+    <nav><a href="/swagger-ui.html">API Docs</a><a href="/actuator/health">Health</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2>User</h2>
+    <div class="row">
+      <label>Select user <select id="userSelect"></select></label>
+    </div>
+    <details style="margin-top:14px">
+      <summary class="muted" style="cursor:pointer">+ Create a new user</summary>
+      <form id="userForm" class="row" style="margin-top:12px">
+        <label>Name <input name="name" required maxlength="100"></label>
+        <label>Email <input name="email" type="email" required maxlength="150"></label>
+        <label>Weight (kg) <input name="weightKg" type="number" min="20" max="300" step="0.1" required></label>
+        <button type="submit">Create</button>
+      </form>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Last 30 days</h2>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card">
+    <h2>Log a workout</h2>
+    <form id="activityForm" class="row">
+      <label>Type <select name="type" id="typeSelect"></select></label>
+      <label>Duration (min) <input name="durationMinutes" type="number" min="1" max="1440" required></label>
+      <label>Distance (km) <input name="distanceKm" type="number" min="0" step="0.1" placeholder="optional"></label>
+      <label>Calories <input name="caloriesBurned" type="number" min="0" placeholder="auto-estimate"></label>
+      <button type="submit">Log</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Activities</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Duration</th><th>Distance</th><th>Calories</th><th></th></tr></thead>
+        <tbody id="activities"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="prev">← Newer</button>
+      <span class="muted" id="pageInfo"></span>
+      <button id="next">Older →</button>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+  const TYPES = ["RUNNING", "WALKING", "CYCLING", "SWIMMING", "YOGA", "WEIGHT_TRAINING", "HIIT"];
+  const $ = (id) => document.getElementById(id);
+  let userId = null, page = 0, totalPages = 0;
+
+  const pretty = (t) => t.charAt(0) + t.slice(1).toLowerCase().replace("_", " ");
+
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.style.display = "block";
+    clearTimeout(el._t);
+    el._t = setTimeout(() => (el.style.display = "none"), 3500);
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+    if (res.status === 204) return null;
+    const body = await res.json();
+    if (!res.ok) {
+      const fieldErrors = body.errors ? Object.entries(body.errors).map(([f, m]) => `${f}: ${m}`).join(", ") : "";
+      throw new Error(fieldErrors || body.detail || "Request failed");
+    }
+    return body;
+  }
+
+  function formData(form) {
+    const data = {};
+    for (const [k, v] of new FormData(form)) if (v !== "") data[k] = v;
+    return data;
+  }
+
+  function cell(text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    return td;
+  }
+
+  async function loadUsers(selectId) {
+    const users = await api("/api/users");
+    const select = $("userSelect");
+    select.replaceChildren(...users.map((u) => new Option(`${u.name} (${u.email})`, u.id)));
+    if (users.length === 0) { userId = null; return; }
+    userId = selectId ?? users[0].id;
+    select.value = userId;
+    await refresh();
+  }
+
+  async function loadStats() {
+    const s = await api(`/api/users/${userId}/stats`);
+    const items = [
+      [s.totalActivities, "Workouts"],
+      [s.totalMinutes, "Active minutes"],
+      [s.totalCalories.toLocaleString(), "Calories burned"],
+      [s.totalDistanceKm + " km", "Distance"],
+      [s.currentStreakDays + " 🔥", "Current streak (days)"],
+      [s.longestStreakDays, "Longest streak (days)"],
+    ];
+    $("stats").replaceChildren(...items.map(([v, l]) => {
+      const div = document.createElement("div");
+      div.className = "stat";
+      div.innerHTML = '<div class="v"></div><div class="l"></div>';
+      div.querySelector(".v").textContent = v;
+      div.querySelector(".l").textContent = l;
+      return div;
+    }));
+  }
+
+  async function loadActivities() {
+    const p = await api(`/api/users/${userId}/activities?page=${page}&size=8`);
+    totalPages = p.totalPages;
+    const rows = p.content.map((a) => {
+      const tr = document.createElement("tr");
+      tr.append(cell(new Date(a.performedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })));
+      const typeTd = document.createElement("td");
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = pretty(a.type);
+      typeTd.append(pill);
+      tr.append(typeTd, cell(a.durationMinutes + " min"),
+        cell(a.distanceKm != null ? a.distanceKm + " km" : "—"), cell(a.caloriesBurned + " kcal"));
+      const actions = document.createElement("td");
+      const del = document.createElement("button");
+      del.className = "link";
+      del.textContent = "Delete";
+      del.onclick = async () => {
+        await api(`/api/activities/${a.id}`, { method: "DELETE" });
+        toast("Activity deleted");
+        await refresh();
+      };
+      actions.append(del);
+      tr.append(actions);
+      return tr;
+    });
+    if (rows.length === 0) {
+      const tr = document.createElement("tr");
+      const td = cell("No activities yet. Log your first workout above.");
+      td.colSpan = 6;
+      td.className = "muted";
+      tr.append(td);
+      rows.push(tr);
+    }
+    $("activities").replaceChildren(...rows);
+    $("pageInfo").textContent = totalPages > 0 ? `Page ${page + 1} of ${totalPages}` : "";
+    $("prev").disabled = page === 0;
+    $("next").disabled = page >= totalPages - 1;
+  }
+
+  async function refresh() {
+    if (!userId) return;
+    await Promise.all([loadStats(), loadActivities()]);
+  }
+
+  $("typeSelect").replaceChildren(...TYPES.map((t) => new Option(pretty(t), t)));
+
+  $("userSelect").onchange = (e) => { userId = e.target.value; page = 0; refresh().catch((err) => toast(err.message)); };
+  $("prev").onclick = () => { page--; loadActivities(); };
+  $("next").onclick = () => { page++; loadActivities(); };
+
+  $("userForm").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const user = await api("/api/users", { method: "POST", body: JSON.stringify(formData(e.target)) });
+      e.target.reset();
+      toast(`User ${user.name} created`);
+      page = 0;
+      await loadUsers(user.id);
+    } catch (err) { toast(err.message); }
+  };
+
+  $("activityForm").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!userId) return toast("Create a user first");
+    try {
+      const a = await api(`/api/users/${userId}/activities`, { method: "POST", body: JSON.stringify(formData(e.target)) });
+      e.target.reset();
+      toast(`Logged ${pretty(a.type)}: ${a.caloriesBurned} kcal`);
+      page = 0;
+      await refresh();
+    } catch (err) { toast(err.message); }
+  };
+
+  loadUsers().catch((err) => toast(err.message));
+</script>
+</body>
+</html>
